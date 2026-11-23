@@ -1,0 +1,39 @@
+name: watch
+
+on:
+  schedule:
+    # Every 15 minutes, off the hour marks where GitHub's scheduler is busiest.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      args:
+        description: 'Extra watch.py arguments, e.g. "--dry-run --date 17122026"'
+        default: ""
+
+concurrency: watch
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      # state.json remembers what was already alerted, so one find is one message.
+      - uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: state-${{ github.run_id }}
+          restore-keys: state-
+      - run: python3 watch.py $WATCH_ARGS
+        env:
+          WATCH_ARGS: ${{ inputs.args }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - uses: actions/cache/save@v4
+        if: always() && hashFiles('state.json') != ''
+        with:
+          path: state.json
+          key: state-${{ github.run_id }}
